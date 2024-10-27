@@ -16,7 +16,6 @@
     let firstTime = true;
 
     const handleTrades = () => {
-        console.log("trades");
         let trades = Object.values(MM.getModels().Trade);
         let tradeMap = {};
 
@@ -25,7 +24,6 @@
             const destination_town_id = trade.attributes.destination_town_id;
 
             let town = MM.getModels().Town[destination_town_id];
-            console.log(town);
             if (!town) return;
 
             let projectedWood = town.attributes.resources.wood + wood;
@@ -85,7 +83,7 @@
                                 }
                             });
                         });
-                        const config = { attributes: true, childList: true, subtree: true };
+                        const config = { attributes: true, childList: false, subtree: false };
                         observer.observe(targetNode, config);
                     } else {
                         firstTime = true;
