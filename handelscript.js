@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Handelscript
 // @namespace    http://tampermonkey.net/
-// @version      2024-10-27
+// @version      2024-11-01
 // @description  try to take over the world!
 // @author       Vonk
 // @match        https://*.grepolis.com/game/*
@@ -16,8 +16,8 @@
     let firstTime = true;
 
     const handleTrades = () => {
-        let trades = Object.values(MM.getModels().Trade);
-        let tradeMap = {};
+        let trades = Object.values(MM.getModels().Trade).sort((a, b) => a.attributes.arrival_at - b.attributes.arrival_at);
+        let tradeMap = {}; 
 
         trades.forEach(trade => {
             const { wood, stone, iron } = trade.attributes;
@@ -26,27 +26,53 @@
             let town = MM.getModels().Town[destination_town_id];
             if (!town) return;
 
-            let projectedWood = town.attributes.resources.wood + wood;
-            let projectedStone = town.attributes.resources.stone + stone;
-            let projectedIron = town.attributes.resources.iron + iron;
+            const storageCapacity = town.getStorageCapacity();
 
-            tradeMap[trade.id] = {
-                projectedWood,
-                projectedStone,
-                projectedIron,
-                townName: town.name,
-            };
+            if (!tradeMap[destination_town_id]) {
+                tradeMap[destination_town_id] = {
+                    cumulativeWood: town.attributes.resources.wood,
+                    cumulativeStone: town.attributes.resources.stone,
+                    cumulativeIron: town.attributes.resources.iron,
+                    townName: town.name,
+                };
+            }
+
+            let projectedWood = tradeMap[destination_town_id].cumulativeWood + wood;
+            let projectedStone = tradeMap[destination_town_id].cumulativeStone + stone;
+            let projectedIron = tradeMap[destination_town_id].cumulativeIron + iron;
+
+            // Update the cumulative totals for the town to include this trade
+            tradeMap[destination_town_id].cumulativeWood = projectedWood;
+            tradeMap[destination_town_id].cumulativeStone = projectedStone;
+            tradeMap[destination_town_id].cumulativeIron = projectedIron;
 
             let timeUntilArrival = (trade.attributes.arrival_at * 1000) - Date.now();
+            //print the seconds of timeuntilarrival
+            console.log(timeUntilArrival / 1000);
             let tradeElement = document.getElementById(`trade_${trade.id}`);
+
             if (tradeElement) {
                 const resourceDetails = `
-                <br>
-                <span class="res_icon resource_wood_icon">${projectedWood}</span>
-                <span class="res_icon resource_stone_icon">${projectedStone}</span>
-                <span class="res_icon resource_iron_icon">${projectedIron}</span>
-            `;
+                    <br>
+                    <span class="res_icon resource_wood_icon">${projectedWood}</span>
+                    <span class="res_icon resource_stone_icon">${projectedStone}</span>
+                    <span class="res_icon resource_iron_icon">${projectedIron}</span>
+                `;
                 tradeElement.insertAdjacentHTML('beforeend', resourceDetails);
+
+                if (projectedWood > storageCapacity || projectedStone > storageCapacity || projectedIron > storageCapacity) {
+                    const woodOverflow = projectedWood % storageCapacity;
+                    const stoneOverflow = projectedStone % storageCapacity;
+                    const ironOverflow = projectedIron % storageCapacity;
+
+                    const overflowText = `
+                        <br>
+                        <span class="res_icon resource_wood_icon" style="color: red;">${woodOverflow}</span>
+                        <span class="res_icon resource_stone_icon" style="color: red;">${stoneOverflow}</span>
+                        <span class="res_icon resource_iron_icon" style="color: red;">${ironOverflow}</span>
+                    `;
+                    tradeElement.insertAdjacentHTML('beforeend', overflowText);
+                }
 
                 if (tradeAlerts[trade.id] !== true) {
                     const alertButton = document.createElement('button');
@@ -111,4 +137,4 @@
             console.log("Trade is done");
         }, time);
     };
-})(); 
+})();
